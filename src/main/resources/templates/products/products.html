@@ -4,12 +4,12 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layouts/layout}">
 <head>
-    <title>Quản lý sản phẩm</title>
+    <title>Quản lý sản phẩm (GraphQL API)</title>
 </head>
 <body>
 <section layout:fragment="content">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2>Quản lý sản phẩm</h2>
+        <h2>Quản lý sản phẩm (GraphQL)</h2>
         <button class="btn btn-primary" onclick="showCreateProductModal()">
             <i class="fas fa-plus me-1"></i> Thêm sản phẩm
         </button>
@@ -54,7 +54,7 @@
             </tr>
             </thead>
             <tbody id="productTableBody">
-            <!-- Loaded via API -->
+            <!-- Loaded via GraphQL API -->
             </tbody>
         </table>
     </div>
@@ -67,7 +67,7 @@
     <!-- PAGINATION -->
     <nav class="mt-4">
         <ul class="pagination justify-content-center" id="pagination">
-            <!-- Pagination loaded via API -->
+            <!-- Pagination loaded via GraphQL -->
         </ul>
     </nav>
 
@@ -75,7 +75,7 @@
     <div class="modal fade" id="createProductModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <form id="addProductForm" enctype="multipart/form-data" onsubmit="return false;">
+                <form id="addProductForm" onsubmit="return false;">
                     <div class="modal-header bg-primary text-white">
                         <h5 class="modal-title"><i class="fas fa-box me-2"></i>Thêm Sản Phẩm Mới</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -87,7 +87,7 @@
                         </div>
                         <div class="col-md-6">
                             <label for="add_brand" class="form-label font-weight-bold">Thương Hiệu</label>
-                            <input type="text" class="form-control" id="add_brand" name="brand" placeholder="Yonex, Victor, Lining...">
+                            <input type="text" class="form-control" id="add_brand" name="brand" placeholder="Yonex, Victor, Li-Ning...">
                         </div>
                         <div class="col-md-6">
                             <label for="add_unitPrice" class="form-label font-weight-bold">Giá Bán (VNĐ) *</label>
@@ -104,8 +104,8 @@
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label for="add_imageFile" class="form-label font-weight-bold">Hình Ảnh Sản Phẩm</label>
-                            <input type="file" class="form-control" id="add_imageFile" name="imageFile" accept="image/*">
+                            <label for="add_imageName" class="form-label font-weight-bold">Tên File Ảnh (trong /uploads/products/)</label>
+                            <input type="text" class="form-control" id="add_imageName" name="imageName" placeholder="astrox100zz.jpg, 65z3.jpg...">
                         </div>
                         <div class="col-md-12">
                             <label for="add_description" class="form-label font-weight-bold">Mô Tả Sản Phẩm</label>
@@ -125,7 +125,7 @@
     <div class="modal fade" id="updateProductModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <form id="updateProductForm" enctype="multipart/form-data" onsubmit="return false;">
+                <form id="updateProductForm" onsubmit="return false;">
                     <div class="modal-header bg-warning text-dark">
                         <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Cập Nhật Sản Phẩm</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -155,8 +155,8 @@
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label font-weight-bold">Thay Đổi Ảnh Mới (Nếu có)</label>
-                            <input type="file" class="form-control" id="edit_imageFile" name="imageFile" accept="image/*">
+                            <label for="edit_imageName" class="form-label font-weight-bold">Tên File Ảnh Mới</label>
+                            <input type="text" class="form-control" id="edit_imageName" name="imageName">
                         </div>
                         <div class="col-md-12">
                             <label for="edit_description" class="form-label font-weight-bold">Mô Tả Sản Phẩm</label>
@@ -172,6 +172,7 @@
         </div>
     </div>
 
+    <!-- GRAPHQL AJAX SCRIPT -->
     <script>
         var currentPage = 0;
 
@@ -179,85 +180,197 @@
             loadCategoriesDropdown();
             loadProductPage(0);
 
+            // Add Product (GraphQL Mutation)
             $('#addProductForm').submit(function(e) {
                 e.preventDefault();
-                var formData = new FormData(this);
+                var name = $('#add_productName').val();
+                var brand = $('#add_brand').val();
+                var price = parseFloat($('#add_unitPrice').val());
+                var quantity = parseInt($('#add_quantity').val());
+                var categoryId = $('#add_categoryId').val() ? $('#add_categoryId').val() : null;
+                var imageName = $('#add_imageName').val();
+                var description = $('#add_description').val();
+
+                var graphqlMutation = {
+                    query: `
+                        mutation CreateProduct($input: ProductInput!) {
+                            createProduct(input: $input) {
+                                id
+                                name
+                            }
+                        }`,
+                    variables: {
+                        input: {
+                            name: name,
+                            brand: brand,
+                            price: price,
+                            quantity: quantity,
+                            categoryId: categoryId,
+                            imageName: imageName,
+                            description: description
+                        }
+                    }
+                };
+
                 $.ajax({
-                    url: '/api/product/addProduct',
+                    url: '/graphql',
                     type: 'POST',
-                    data: formData,
-                    cache: false,
-                    contentType: false,
-                    processData: false,
-                    success: function(response) {
-                        $('#createProductModal').modal('hide');
-                        $('#addProductForm')[0].reset();
-                        alert(response.message || 'Thêm sản phẩm thành công!');
-                        loadProductPage(currentPage);
+                    contentType: 'application/json',
+                    data: JSON.stringify(graphqlMutation),
+                    success: function(res) {
+                        if (res.data && res.data.createProduct) {
+                            $('#createProductModal').modal('hide');
+                            $('#addProductForm')[0].reset();
+                            alert('Thêm sản phẩm thành công!');
+                            loadProductPage(currentPage);
+                        } else {
+                            alert('Thêm sản phẩm thất bại!');
+                        }
                     },
-                    error: function(xhr) {
-                        var err = xhr.responseJSON ? xhr.responseJSON.message : 'Thêm sản phẩm thất bại!';
-                        alert(err);
+                    error: function(err) {
+                        alert('Lỗi kết nối GraphQL!');
                     }
                 });
             });
 
+            // Update Product (GraphQL Mutation)
             $('#updateProductForm').submit(function(e) {
                 e.preventDefault();
-                var formData = new FormData(this);
+                var id = $('#edit_id').val();
+                var name = $('#edit_productName').val();
+                var brand = $('#edit_brand').val();
+                var price = parseFloat($('#edit_unitPrice').val());
+                var quantity = parseInt($('#edit_quantity').val());
+                var categoryId = $('#edit_categoryId').val() ? $('#edit_categoryId').val() : null;
+                var imageName = $('#edit_imageName').val();
+                var description = $('#edit_description').val();
+
+                var graphqlMutation = {
+                    query: `
+                        mutation UpdateProduct($id: ID!, $input: ProductInput!) {
+                            updateProduct(id: $id, input: $input) {
+                                id
+                                name
+                            }
+                        }`,
+                    variables: {
+                        id: id,
+                        input: {
+                            name: name,
+                            brand: brand,
+                            price: price,
+                            quantity: quantity,
+                            categoryId: categoryId,
+                            imageName: imageName,
+                            description: description
+                        }
+                    }
+                };
+
                 $.ajax({
-                    url: '/api/product/updateProduct',
-                    type: 'PUT',
-                    data: formData,
-                    cache: false,
-                    contentType: false,
-                    processData: false,
-                    success: function(response) {
-                        $('#updateProductModal').modal('hide');
-                        alert(response.message || 'Cập nhật sản phẩm thành công!');
-                        loadProductPage(currentPage);
+                    url: '/graphql',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(graphqlMutation),
+                    success: function(res) {
+                        if (res.data && res.data.updateProduct) {
+                            $('#updateProductModal').modal('hide');
+                            alert('Cập nhật sản phẩm thành công!');
+                            loadProductPage(currentPage);
+                        } else {
+                            alert('Cập nhật thất bại!');
+                        }
                     },
-                    error: function(xhr) {
-                        var err = xhr.responseJSON ? xhr.responseJSON.message : 'Cập nhật sản phẩm thất bại!';
-                        alert(err);
+                    error: function(err) {
+                        alert('Lỗi kết nối GraphQL!');
                     }
                 });
             });
         });
 
+        // Load Categories for Dropdown (GraphQL Query)
         function loadCategoriesDropdown() {
+            var graphqlQuery = {
+                query: `
+                    query {
+                        categories {
+                            categoryId
+                            categoryName
+                        }
+                    }`
+            };
+
             $.ajax({
-                url: '/api/category',
-                type: 'GET',
-                success: function(categories) {
-                    var select = $('.categorySelect');
-                    select.find('option:not(:first)').remove();
-                    $.each(categories, function(i, cat) {
-                        select.append('<option value="' + cat.categoryId + '">' + cat.categoryName + '</option>');
-                    });
+                url: '/graphql',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(graphqlQuery),
+                success: function(res) {
+                    if (res.data && res.data.categories) {
+                        var select = $('.categorySelect');
+                        select.find('option:not(:first)').remove();
+                        $.each(res.data.categories, function(i, cat) {
+                            select.append('<option value="' + cat.categoryId + '">' + escapeHtml(cat.categoryName) + '</option>');
+                        });
+                    }
                 }
             });
         }
 
+        // Load Products Page (GraphQL Query)
         function loadProductPage(page) {
             currentPage = page;
             var keyword = $('#searchKeyword').val();
-            var size = $('#pageSize').val();
+            var size = parseInt($('#pageSize').val());
 
-            $.ajax({
-                url: '/api/product/page',
-                type: 'GET',
-                data: {
+            var graphqlQuery = {
+                query: `
+                    query GetProductsPage($keyword: String, $page: Int, $size: Int) {
+                        productsPage(keyword: $keyword, page: $page, size: $size) {
+                            content {
+                                id
+                                name
+                                brand
+                                price
+                                quantity
+                                description
+                                category {
+                                    categoryId
+                                    categoryName
+                                }
+                                images {
+                                    imageUrl
+                                }
+                            }
+                            totalPages
+                            totalElements
+                            number
+                            size
+                            first
+                            last
+                        }
+                    }`,
+                variables: {
                     keyword: keyword,
                     page: page,
                     size: size
-                },
-                success: function(data) {
-                    renderProductTable(data.content);
-                    renderPagination(data);
+                }
+            };
+
+            $.ajax({
+                url: '/graphql',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(graphqlQuery),
+                success: function(res) {
+                    if (res.data && res.data.productsPage) {
+                        var pageData = res.data.productsPage;
+                        renderProductTable(pageData.content);
+                        renderPagination(pageData);
+                    }
                 },
                 error: function(err) {
-                    console.error("Lỗi khi tải danh sách sản phẩm:", err);
+                    console.error("Lỗi khi tải danh sách sản phẩm GraphQL:", err);
                 }
             });
         }
@@ -279,7 +392,7 @@
                     '<img src="/uploads/products/' + imgUrl + '" style="width: 60px; height: 60px; object-fit: cover; border-radius: 6px;" onerror="this.onerror=null; this.src=\'/uploads/' + imgUrl + '\';">' :
                     '<span class="text-muted"><i class="fas fa-image fa-2x"></i></span>';
 
-                var categoryName = p.category ? p.category.categoryName : '<span class="text-muted">Chưa phân loại</span>';
+                var categoryName = p.category ? escapeHtml(p.category.categoryName) : '<span class="text-muted">Chưa phân loại</span>';
                 var priceFormatted = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(p.price || 0);
 
                 var tr = '<tr>' +
@@ -323,12 +436,37 @@
         }
 
         function showEditProductModal(id) {
+            var graphqlQuery = {
+                query: `
+                    query GetProductById($id: ID!) {
+                        productById(id: $id) {
+                            id
+                            name
+                            brand
+                            price
+                            quantity
+                            description
+                            category {
+                                categoryId
+                            }
+                            images {
+                                imageUrl
+                            }
+                        }
+                    }`,
+                variables: {
+                    id: id
+                }
+            };
+
             $.ajax({
-                url: '/api/product/' + id,
-                type: 'GET',
+                url: '/graphql',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(graphqlQuery),
                 success: function(res) {
-                    if (res.status && res.data) {
-                        var p = res.data;
+                    if (res.data && res.data.productById) {
+                        var p = res.data.productById;
                         $('#edit_id').val(p.id);
                         $('#edit_productName').val(p.name);
                         $('#edit_brand').val(p.brand);
@@ -340,24 +478,42 @@
                         } else {
                             $('#edit_categoryId').val('');
                         }
+                        var imgUrl = (p.images && p.images.length > 0) ? p.images[0].imageUrl : '';
+                        $('#edit_imageName').val(imgUrl);
                         $('#updateProductModal').modal('show');
                     }
                 }
             });
         }
 
+        // Delete Product (GraphQL Mutation)
         function deleteProduct(id) {
             if (confirm("Bạn có chắc chắn muốn xóa sản phẩm này không?")) {
+                var graphqlMutation = {
+                    query: `
+                        mutation DeleteProduct($id: ID!) {
+                            deleteProduct(id: $id)
+                        }`,
+                    variables: {
+                        id: id
+                    }
+                };
+
                 $.ajax({
-                    url: '/api/product/deleteProduct?id=' + id,
-                    type: 'DELETE',
-                    success: function(response) {
-                        alert(response.message || 'Xóa sản phẩm thành công!');
-                        loadProductPage(currentPage);
+                    url: '/graphql',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(graphqlMutation),
+                    success: function(res) {
+                        if (res.data && res.data.deleteProduct) {
+                            alert('Xóa sản phẩm thành công!');
+                            loadProductPage(currentPage);
+                        } else {
+                            alert('Xóa sản phẩm thất bại!');
+                        }
                     },
-                    error: function(xhr) {
-                        var err = xhr.responseJSON ? xhr.responseJSON.message : 'Xóa sản phẩm thất bại!';
-                        alert(err);
+                    error: function(err) {
+                        alert('Lỗi kết nối GraphQL!');
                     }
                 });
             }
