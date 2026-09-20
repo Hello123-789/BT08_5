@@ -4,12 +4,12 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layouts/layout}">
 <head>
-    <title>Quản lý danh mục</title>
+    <title>Quản lý danh mục (GraphQL API)</title>
 </head>
 <body>
 <section layout:fragment="content">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2>Quản lý danh mục</h2>
+        <h2>Quản lý danh mục (GraphQL)</h2>
         <button class="btn btn-success" onclick="showCreateCategoryModal()">
             <i class="fas fa-plus me-1"></i> Thêm danh mục
         </button>
@@ -50,7 +50,7 @@
             </tr>
             </thead>
             <tbody id="categoryTableBody">
-            <!-- Loaded via API -->
+            <!-- Loaded via GraphQL API -->
             </tbody>
         </table>
     </div>
@@ -63,7 +63,7 @@
     <!-- PAGINATION -->
     <nav class="mt-4">
         <ul class="pagination justify-content-center" id="pagination">
-            <!-- Pagination items loaded via API -->
+            <!-- Pagination loaded via GraphQL -->
         </ul>
     </nav>
 
@@ -71,7 +71,7 @@
     <div class="modal fade" id="createCategoryModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form id="addCategoryForm" enctype="multipart/form-data" onsubmit="return false;">
+                <form id="addCategoryForm" onsubmit="return false;">
                     <div class="modal-header bg-success text-white">
                         <h5 class="modal-title"><i class="fas fa-folder-plus me-2"></i>Thêm Danh Mục Mới</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -82,8 +82,8 @@
                             <input type="text" class="form-control" id="new_categoryName" name="categoryName" required placeholder="Nhập tên danh mục">
                         </div>
                         <div class="mb-3">
-                            <label for="new_icon" class="form-label font-weight-bold">Hình ảnh / Icon</label>
-                            <input type="file" class="form-control" id="new_icon" name="icon" accept="image/*">
+                            <label for="new_icon" class="form-label font-weight-bold">Tên File Icon (trong /uploads/categories/)</label>
+                            <input type="text" class="form-control" id="new_icon" name="icon" placeholder="Vợt_cầu_lông.png, giay_cau_long.jpg...">
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -99,7 +99,7 @@
     <div class="modal fade" id="updateCategoryModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form id="updateCategoryForm" enctype="multipart/form-data" onsubmit="return false;">
+                <form id="updateCategoryForm" onsubmit="return false;">
                     <div class="modal-header bg-warning text-dark">
                         <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Cập Nhật Danh Mục</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -111,10 +111,8 @@
                             <input type="text" class="form-control" id="edit_categoryName" name="categoryName" required>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label font-weight-bold">Icon Hiện Tại</label>
-                            <div id="currentIconPreview" class="mb-2"></div>
-                            <label for="edit_icon" class="form-label font-weight-bold">Thay Đổi Icon Mới (Nếu có)</label>
-                            <input type="file" class="form-control" id="edit_icon" name="icon" accept="image/*">
+                            <label for="edit_icon" class="form-label font-weight-bold">Tên File Icon</label>
+                            <input type="text" class="form-control" id="edit_icon" name="icon">
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -126,77 +124,147 @@
         </div>
     </div>
 
+    <!-- GRAPHQL AJAX SCRIPT -->
     <script>
         var currentPage = 0;
 
         $(document).ready(function() {
             loadCategoryPage(0);
 
+            // Add Category (GraphQL Mutation)
             $('#addCategoryForm').submit(function(e) {
                 e.preventDefault();
-                var formData = new FormData(this);
+                var name = $('#new_categoryName').val();
+                var icon = $('#new_icon').val();
+
+                var graphqlMutation = {
+                    query: `
+                        mutation CreateCategory($input: CategoryInput!) {
+                            createCategory(input: $input) {
+                                categoryId
+                                categoryName
+                                icon
+                            }
+                        }`,
+                    variables: {
+                        input: {
+                            categoryName: name,
+                            icon: icon
+                        }
+                    }
+                };
+
                 $.ajax({
-                    url: '/api/category/addCategory',
+                    url: '/graphql',
                     type: 'POST',
-                    data: formData,
-                    cache: false,
-                    contentType: false,
-                    processData: false,
-                    success: function(response) {
-                        $('#createCategoryModal').modal('hide');
-                        $('#addCategoryForm')[0].reset();
-                        alert(response.message || 'Thêm danh mục thành công!');
-                        loadCategoryPage(currentPage);
+                    contentType: 'application/json',
+                    data: JSON.stringify(graphqlMutation),
+                    success: function(res) {
+                        if (res.data && res.data.createCategory) {
+                            $('#createCategoryModal').modal('hide');
+                            $('#addCategoryForm')[0].reset();
+                            alert('Thêm danh mục thành công!');
+                            loadCategoryPage(currentPage);
+                        } else {
+                            alert('Thêm danh mục thất bại!');
+                        }
                     },
                     error: function(xhr) {
-                        var err = xhr.responseJSON ? xhr.responseJSON.message : 'Thêm danh mục thất bại!';
-                        alert(err);
+                        alert('Lỗi kết nối GraphQL!');
                     }
                 });
             });
 
+            // Update Category (GraphQL Mutation)
             $('#updateCategoryForm').submit(function(e) {
                 e.preventDefault();
-                var formData = new FormData(this);
+                var id = $('#edit_categoryId').val();
+                var name = $('#edit_categoryName').val();
+                var icon = $('#edit_icon').val();
+
+                var graphqlMutation = {
+                    query: `
+                        mutation UpdateCategory($id: ID!, $input: CategoryInput!) {
+                            updateCategory(id: $id, input: $input) {
+                                categoryId
+                                categoryName
+                                icon
+                            }
+                        }`,
+                    variables: {
+                        id: id,
+                        input: {
+                            categoryName: name,
+                            icon: icon
+                        }
+                    }
+                };
+
                 $.ajax({
-                    url: '/api/category/updateCategory',
-                    type: 'PUT',
-                    data: formData,
-                    cache: false,
-                    contentType: false,
-                    processData: false,
-                    success: function(response) {
-                        $('#updateCategoryModal').modal('hide');
-                        alert(response.message || 'Cập nhật danh mục thành công!');
-                        loadCategoryPage(currentPage);
+                    url: '/graphql',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(graphqlMutation),
+                    success: function(res) {
+                        if (res.data && res.data.updateCategory) {
+                            $('#updateCategoryModal').modal('hide');
+                            alert('Cập nhật danh mục thành công!');
+                            loadCategoryPage(currentPage);
+                        } else {
+                            alert('Cập nhật thất bại!');
+                        }
                     },
                     error: function(xhr) {
-                        var err = xhr.responseJSON ? xhr.responseJSON.message : 'Cập nhật danh mục thất bại!';
-                        alert(err);
+                        alert('Lỗi kết nối GraphQL!');
                     }
                 });
             });
         });
 
+        // Load Categories Page (GraphQL Query)
         function loadCategoryPage(page) {
             currentPage = page;
             var keyword = $('#searchKeyword').val();
-            var size = $('#pageSize').val();
+            var size = parseInt($('#pageSize').val());
 
-            $.ajax({
-                url: '/api/category/page',
-                type: 'GET',
-                data: {
+            var graphqlQuery = {
+                query: `
+                    query GetCategoriesPage($keyword: String, $page: Int, $size: Int) {
+                        categoriesPage(keyword: $keyword, page: $page, size: $size) {
+                            content {
+                                categoryId
+                                categoryName
+                                icon
+                            }
+                            totalPages
+                            totalElements
+                            number
+                            size
+                            first
+                            last
+                        }
+                    }`,
+                variables: {
                     keyword: keyword,
                     page: page,
                     size: size
-                },
-                success: function(data) {
-                    renderCategoryTable(data.content);
-                    renderPagination(data);
+                }
+            };
+
+            $.ajax({
+                url: '/graphql',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(graphqlQuery),
+                success: function(res) {
+                    if (res.data && res.data.categoriesPage) {
+                        var pageData = res.data.categoriesPage;
+                        renderCategoryTable(pageData.content);
+                        renderPagination(pageData);
+                    }
                 },
                 error: function(err) {
-                    console.error("Lỗi khi tải danh sách danh mục:", err);
+                    console.error("Lỗi tải danh mục GraphQL:", err);
                 }
             });
         }
@@ -220,7 +288,7 @@
                 var tr = '<tr>' +
                     '<td>' + cat.categoryId + '</td>' +
                     '<td>' + iconHtml + '</td>' +
-                    '<td class="fw-bold">' + cat.categoryName + '</td>' +
+                    '<td class="fw-bold">' + escapeHtml(cat.categoryName) + '</td>' +
                     '<td class="text-center">' +
                     '  <button class="btn btn-outline-warning btn-sm me-2" onclick="showEditModal(' + cat.categoryId + ', \'' + escapeHtml(cat.categoryName) + '\', \'' + (cat.icon || '') + '\')"><i class="fas fa-edit me-1"></i>Sửa</button>' +
                     '  <button class="btn btn-outline-danger btn-sm" onclick="deleteCategory(' + cat.categoryId + ')"><i class="fas fa-trash me-1"></i>Xóa</button>' +
@@ -256,26 +324,38 @@
         function showEditModal(id, name, icon) {
             $('#edit_categoryId').val(id);
             $('#edit_categoryName').val(name);
-            if (icon) {
-                $('#currentIconPreview').html('<img src="/uploads/categories/' + icon + '" style="width: 60px; height: 60px; object-fit: cover; border-radius: 6px;">');
-            } else {
-                $('#currentIconPreview').html('<span class="text-muted">Chưa có icon</span>');
-            }
+            $('#edit_icon').val(icon);
             $('#updateCategoryModal').modal('show');
         }
 
+        // Delete Category (GraphQL Mutation)
         function deleteCategory(id) {
             if (confirm("Bạn có chắc chắn muốn xóa danh mục này không?")) {
+                var graphqlMutation = {
+                    query: `
+                        mutation DeleteCategory($id: ID!) {
+                            deleteCategory(id: $id)
+                        }`,
+                    variables: {
+                        id: id
+                    }
+                };
+
                 $.ajax({
-                    url: '/api/category/deleteCategory?categoryId=' + id,
-                    type: 'DELETE',
-                    success: function(response) {
-                        alert(response.message || 'Xóa danh mục thành công!');
-                        loadCategoryPage(currentPage);
+                    url: '/graphql',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(graphqlMutation),
+                    success: function(res) {
+                        if (res.data && res.data.deleteCategory) {
+                            alert('Xóa danh mục thành công!');
+                            loadCategoryPage(currentPage);
+                        } else {
+                            alert('Xóa danh mục thất bại!');
+                        }
                     },
-                    error: function(xhr) {
-                        var err = xhr.responseJSON ? xhr.responseJSON.message : 'Xóa danh mục thất bại!';
-                        alert(err);
+                    error: function(err) {
+                        alert('Lỗi kết nối GraphQL!');
                     }
                 });
             }
